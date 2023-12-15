@@ -1,23 +1,32 @@
-import logo from './logo.svg';
-import './App.css';
+import { BrowserRouter, Route, Switch } from 'react-router-dom';
+import './scss/style.scss';
+import SimGamepadDemo from './SimGamepadDemo';
 
 function App() {
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+    <BrowserRouter>
+      <Switch>
+        <Route exact path="/simgamepaddemo" name="Sim Gamepad Demo"><SimGamepadDemo /></Route>
+        <Route path="/" name="Home"><Home /></Route>
+      </Switch>
+    </BrowserRouter>
+  );
+}
+
+function Home() {
+  return (
+    <div>
+      <h2>Home</h2>
+      <nav>
+        <ul>
+          <li>
+            <a href="/">Home</a>
+          </li>
+          <li>
+            <a href="/simgamepaddemo">Sim Gamepad Demo</a>
+          </li>
+        </ul>
+      </nav>
     </div>
   );
 }
