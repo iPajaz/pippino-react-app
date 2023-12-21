@@ -29,5 +29,5 @@ Build image:
 
 Run:
 
-### `docker run -it --rm -p 3000:3000 pippino_react_app`
+### `docker run -it --rm -p 3000:3000 --name pippino_react_app pippino_react_app`
 
