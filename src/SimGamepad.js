@@ -10,7 +10,8 @@ import {
 } from '@coreui/react'
 import ROSLIB from 'roslib';
 import SimJoystick from './SimJoystick';
-
+import mqtt from 'mqtt';
+import mqtt_settings from './MqttSettings';
 class SimGamepad extends Component {
 
   constructor(props) {
@@ -30,29 +31,63 @@ class SimGamepad extends Component {
       vacuumEnabled: false,
       probeExtended: true,
     };
+    this.mqtt_sub_topic = "pippino/status"
     this.joyTimeout = 2000;
     this.pubTimerMs = 40;
     this.refreshCamTimerMs = 2000;
     this.ros = new ROSLIB.Ros();
+
+    this.mqtt_cli = mqtt.connect(mqtt_settings.connect_url, {
+      connectTimeout: 1000,
+      username: mqtt_settings.username,
+      password: mqtt_settings.password,
+      keepalive: 20,
+      reconnectPeriod: 4000,
+    })
+
+    this.mqtt_cli.on('connect', () => {
+      console.log('Connected')
+
+    })
+
+    this.mqtt_cli.on('message', (topic, payload) => {
+      console.log('Received Message:', topic, payload.toString())
+      if(payload.toString() === '1'){
+        this.ros.close();
+        setTimeout(() => {
+          this.ros.connect(this.props.rosbridgeAddress);
+        }, 1000);
+      }
+    })
+
   }
 
   componentDidMount() {
-
-    // If there is an error on the backend, an 'error' emit will be emitted.
-    this.ros.on('error', function (error) {
-      console.log(error);
+    this.mqtt_cli.subscribe([this.mqtt_sub_topic], () => {
+      console.log(`Subscribe to topic '${this.mqtt_sub_topic}'`)
     });
+
+    this.interval = setInterval(() => {
+      if(!this.ros.isConnected){
+        console.log("trying to connect to rosbridge");
+        this.ros.connect(this.props.rosbridgeAddress);
+      }
+    }, 2000);
 
     // Find out exactly when we made a connection.
     this.ros.on('connection', function () {
-      console.log('Connection made!');
-    });
+      this.updateLogFromTxt('Rosbridge connection made!');
+      clearInterval(this.interval);
+    }.bind(this));
 
     this.ros.on('close', function () {
       console.log('Connection closed.');
     });
 
-    this.ros.connect(this.props.rosbridgeAddress);
+    // If there is an error on the backend, an 'error' emit will be emitted.
+    this.ros.on('error', function (error) {
+      console.log(error);
+    });
 
     this.joy_topic = new ROSLIB.Topic({
       ros: this.ros,
@@ -128,16 +163,22 @@ class SimGamepad extends Component {
     this.ros.close();
   }
 
-  updateLogFromTxt (data) {
+  updateLogFromTxt = (data) => {
     if (this.state.loggingList.push("System: " + data) > 5)
       this.state.loggingList.shift();
     this.setState({ loggingText: this.state.loggingList.join('\n') })
   }
 
   stopPippino () {
-    console.log('stopping');
+    this.updateLogFromTxt('Sending Pippino to sleep.');
+    this.mqtt_cli.publish('pippino/power', '0', { qos: 0, retain: false }, (error) => {
+      if (error) {
+        console.error(error);
+      }
+    })
   }
-
+/*
+  // Using hass API
   startupPippino () {
     fetch('http://192.168.0.28:8123/api/events/pippino_on', {
       method: "POST",
@@ -152,6 +193,17 @@ class SimGamepad extends Component {
     }).then(data => {
       this.updateLogFromTxt(data.message);
     });
+  }
+  */
+
+ // Using MQTT
+ startupPippino () {
+    this.updateLogFromTxt('Waking up Pippino!');
+    this.mqtt_cli.publish('pippino/power', '1', { qos: 0, retain: false }, (error) => {
+      if (error) {
+        console.error(error);
+      }
+    })
   }
 
   enableJoy () {
@@ -500,7 +552,7 @@ class SimGamepad extends Component {
           const vacuumPromise = this.retractProbe();
           vacuumPromise.then(function (success) {
             if (success) {
-              console.log("its success 1");
+              this.updateLogFromTxt("Successfully retracted probe.");
               var buttonNames = this.state.buttonNames;
               buttonNames[8] = "Extend Probe";
               this.setState({ buttonNames: buttonNames, probeExtended: false });
@@ -510,7 +562,7 @@ class SimGamepad extends Component {
           const vacuumPromise = this.extendProbe();
           vacuumPromise.then(function (success) {
             if (success) {
-              console.log("its success 2");
+              this.updateLogFromTxt("Successfully extended probe.");
               var buttonNames = this.state.buttonNames;
               buttonNames[8] = "Retract Probe";
               this.setState({ buttonNames: buttonNames, probeExtended: true });
@@ -518,12 +570,12 @@ class SimGamepad extends Component {
           }.bind(this))
         }
         break;
-      case 9:
-        if (this.state.vacuumEnabled) {
+        case 9:
+          if (this.state.vacuumEnabled) {
           const vacuumPromise = this.disableVacuum();
           vacuumPromise.then(function (success) {
             if (success) {
-              // console.log("its success 1");
+              this.updateLogFromTxt("Successfully disabled vacuum.");
               var buttonNames = this.state.buttonNames;
               buttonNames[9] = "Start Vacuum";
               this.setState({ buttonNames: buttonNames, vacuumEnabled: false });
@@ -533,7 +585,7 @@ class SimGamepad extends Component {
           const vacuumPromise = this.enableVacuum();
           vacuumPromise.then(function (success) {
             if (success) {
-              // console.log("its success 2");
+              this.updateLogFromTxt("Successfully enabled vacuum.");
               var buttonNames = this.state.buttonNames;
               buttonNames[9] = "Stop Vacuum";
               this.setState({ buttonNames: buttonNames, vacuumEnabled: true });
@@ -578,7 +630,7 @@ class SimGamepad extends Component {
     axisVals[2*index] = 0;
     axisVals[2*index+1] = 0;
     this.setState({ axes: axisVals });
-    console.log("stopping joy");
+    this.updateLogFromTxt("Stopping JOY.");
     this.publishJoy(true);
   }
 

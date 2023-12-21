@@ -10,6 +10,7 @@
     "axios": "^1.6.2",
     "chokidar": "^3.5.3",
     "gamepads": "^1.2.2",
+    "mqtt": "^5.3.3",
     "node-fetch": "^3.3.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
