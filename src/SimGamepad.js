@@ -51,6 +51,7 @@ class SimGamepad extends Component {
       loggingList: [],
       vacuumEnabled: false,
       probeExtended: true,
+      connectingToRos: true,
     };
     this.mqtt_sub_topic = "pippino/status"
     this.joyTimeout = 2000;
@@ -67,20 +68,31 @@ class SimGamepad extends Component {
     })
 
     this.mqtt_cli.on('connect', () => {
-      console.log('Connected')
-
+      console.log('Connected to MQTT server.');
     })
 
-    this.mqtt_cli.on('message', (topic, payload) => {
-      console.log('Received Message:', topic, payload.toString())
-      if(payload.toString() === '1'){
-        this.ros.close();
-        setTimeout(() => {
+    // this.mqtt_cli.on('message', (topic, payload) => {
+    //   console.log('Received Message:', topic, payload.toString())
+    //   if(payload.toString() === '1'){
+    //     this.ros.close();
+    //     setTimeout(() => {
+    //       this.ros.connect(this.props.rosbridgeAddress);
+    //     }, 1000);
+    //   }
+    // })
+
+  }
+
+  reconnectToRos = () => {
+    clearInterval(this.interval);
+    this.interval = setInterval(() => {
+      if (this.state.connectingToRos){
+        if (!this.ros.isConnected) {
+          console.log("trying to connect to rosbridge");
           this.ros.connect(this.props.rosbridgeAddress);
-        }, 1000);
+        }
       }
-    })
-
+    }, 2000);
   }
 
   componentDidMount() {
@@ -88,21 +100,22 @@ class SimGamepad extends Component {
       console.log(`Subscribe to topic '${this.mqtt_sub_topic}'`)
     });
 
-    this.interval = setInterval(() => {
-      if(!this.ros.isConnected){
-        console.log("trying to connect to rosbridge");
-        this.ros.connect(this.props.rosbridgeAddress);
-      }
-    }, 2000);
+    // Find out exactly when we made a connection.
+    this.reconnectToRos();
 
     // Find out exactly when we made a connection.
     this.ros.on('connection', function () {
       this.updateLogFromTxt('Rosbridge connection made!');
+      this.state.connectingToRos = false;
       clearInterval(this.interval);
     }.bind(this));
 
-    this.ros.on('close', function () {
-      console.log('Connection closed.');
+    this.ros.on('close', () => {
+      if(!this.state.connectingToRos){
+        this.updateLogFromTxt('Rosbridge connection closed.');
+        this.state.connectingToRos = true;
+        this.reconnectToRos();
+      }
     });
 
     // If there is an error on the backend, an 'error' emit will be emitted.
