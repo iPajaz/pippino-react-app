@@ -10,14 +10,35 @@ import {
 } from '@coreui/react'
 import ROSLIB from 'roslib';
 import SimJoystick from './SimJoystick';
+import SimNodeStatusTable from './SimNodeStatus';
 import mqtt from 'mqtt';
 import mqtt_settings from './MqttSettings';
-class SimGamepad extends Component {
 
+const node_short_names = {
+  'video_stream_controller': 'VSC',
+  'aruco_detection_service': 'ARU',
+  'discoverer_server': 'DIS',
+  'autodock_action_server': 'ADS',
+  'behavior_server': 'BEH',
+  'discover_action_client': 'DIC',
+  'autodock_action_client': 'ADC',
+  'lifecycle_manager_navigation': 'LIF',
+  'slam_toolbox': 'SLA',
+  'D455': 'D455',
+  'T265': 'T265',
+  'global_costmap': 'GCM',
+  'bt_navigator': 'BTN',
+  'rplidar_node': 'RPL'
+}
+
+class SimGamepad extends Component {
   constructor(props) {
     super(props);
     this.controllers = {};
+    this.node_st_n_per_col = 4;
     this.state = {
+      node_names: [],
+      node_statuses: [],
       buttons: [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
       buttonNames: ["Color Cam", "Fisheye Cam", "Disable Cams", "Enable Joy", "Go to Dock", "Cancel Action", "Undock", "Find yourself", "Retract Probe", "Start Vacuum", "Start Coverage", "Stop Coverage", "Startup", "Poweroff"],
       axes: [0,0],
@@ -107,40 +128,53 @@ class SimGamepad extends Component {
       messageType : 'std_msgs/String'
     });
 
-    // Services
+    var pippino_node_fail_listener = new ROSLIB.Topic({
+      ros : this.ros,
+      name: '/pippino_node_fail',
+      messageType : 'std_msgs/String'
+    });
 
+    var pippino_node_status_listener = new ROSLIB.Topic({
+      ros : this.ros,
+      name: '/pippino_node_status',
+      messageType : 'pippino_interfaces/msg/NodesStatus'
+    });
+
+    // Service clients
     this.pippino_video_stream_client = new ROSLIB.Service({
       ros : this.ros,
       name: '/pippino_video_stream',
-      serviceType: 'pippino_service_msg/srv/PippinoVideoStream'
+      serviceType: 'pippino_interfaces/srv/PippinoVideoStream'
     });
 
     this.pippino_autodock_actions_client = new ROSLIB.Service({
       ros : this.ros,
       name: '/pippino_autodock_actions',
-      serviceType: 'pippino_service_msg/srv/PippinoAutodockActions'
+      serviceType: 'pippino_interfaces/srv/PippinoAutodockActions'
     });
 
     this.pippino_coverage_actions_client = new ROSLIB.Service({
       ros : this.ros,
       name: '/pippino_coverage_actions',
-      serviceType: 'pippino_service_msg/srv/PippinoCoverageActions'
+      serviceType: 'pippino_interfaces/srv/PippinoCoverageActions'
     });
 
     this.pippino_actuators_client = new ROSLIB.Service({
       ros : this.ros,
       name: '/pippino_actuators',
-      serviceType: 'pippino_service_msg/srv/PippinoActuators'
+      serviceType: 'pippino_interfaces/srv/PippinoActuators'
     });
 
     this.pippino_discovery_client = new ROSLIB.Service({
       ros: this.ros,
       name: '/pippino_discover_actions',
-      serviceType: 'pippino_service_msg/srv/PippinoDiscoverActions'
+      serviceType: 'pippino_interfaces/srv/PippinoDiscoverActions'
     })
 
     battery_level_listener.subscribe(this.updateBatteryValue);
     pippino_log_listener.subscribe(this.updateLogFromMsg);
+    pippino_node_fail_listener.subscribe(this.updateLogFromFailMsg);
+    pippino_node_status_listener.subscribe(this.updateNodeStatusTable);
 
     setInterval(this.pubTimerEnd, this.pubTimerMs);
     setInterval(this.refreshCam, this.refreshCamTimerMs);
@@ -152,6 +186,22 @@ class SimGamepad extends Component {
     if (this.state.loggingList.push(message.data) > 5)
       this.state.loggingList.shift();
     this.setState({ loggingText: this.state.loggingList.join('\n') })
+  }
+
+  updateLogFromFailMsg = (message) => {
+    if (this.state.loggingList.push('ERROR: ' + message.data) > 5)
+      this.state.loggingList.shift();
+    this.setState({ loggingText: this.state.loggingList.join('\n') })
+  }
+
+  updateNodeStatusTable = (message) => {
+    var node_names = [];
+    var node_statuses = [];
+    message.nodes.forEach((node) => {
+      node_names.push(node_short_names[node.name]);
+      node_statuses.push(node.status);
+    })
+    this.setState({ node_names: node_names, node_statuses: node_statuses });
   }
 
   updateBatteryValue = (message) => {
@@ -183,7 +233,7 @@ class SimGamepad extends Component {
     fetch('http://192.168.0.28:8123/api/events/pippino_on', {
       method: "POST",
       headers: {
-        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiI0ZWRhZDFmMzdlZjY0ZTRiYWJjNGY0MGVmOTIyMTYyNiIsImlhdCI6MTcwMjQwODk1MiwiZXhwIjoyMDE3NzY4OTUyfQ.UFIY_zhbUBoZBHO3d1rqYRn-r13ukPN9BsH_Qvb1zMY' }
+        'Authorization': 'Bearer ???' }
       }).then(function (response) {
       if (!response.ok) {
         return Promise.reject(response);
@@ -636,8 +686,10 @@ class SimGamepad extends Component {
 
   joyMove = (x, y, index) =>{
     var axisVals =  this.state.axes;
-    x*=100;
-    y*=100;
+    // y: forward/back, x: rotation
+    x*=300;
+    y*=30000 * y;
+    console.log(y);
     axisVals[2*index+1] = y;
     if (y>0){
       axisVals[2*index] = x;
@@ -655,13 +707,18 @@ class SimGamepad extends Component {
       '--cui-btn-padding-x': '5px',
       '--cui-btn-padding-y': '0px'
     }
-    let buttons = this.state.buttons.map((item, index) => <CCol style={vars} key={index} className="mb-xs-0 d-grid gap-2">
-      <CButton style={vars} className="button-fixed-height" size="sm" block="true" color={item > 0 ? "primary" : "secondary"} onPointerDown={() => this.buttonOn(index)} onPointerUp={() => this.buttonOff(index)} >{this.state.buttonNames[index]}</CButton>
+    let buttons = this.state.buttons.map((value, index) => <CCol style={vars} key={index} className="mb-xs-0 d-grid gap-2">
+      <CButton style={vars} className="button-fixed-height" size="sm" block="true" color={value > 0 ? "primary" : "secondary"} onPointerDown={() => this.buttonOn(index)} onPointerUp={() => this.buttonOff(index)} >{this.state.buttonNames[index]}</CButton>
     </CCol>);
 
     let stickDisplays = this.state.sticks.map((item, index) => <CCol key={index} xl style={{ display: "flex", width: "80%", justifyContent: "center" }} className="mb-3 mb-xl-0">
       <SimJoystick size={80} move={(x,y) => this.joyMove(x,y, index)} stop={() => this.joyStop(index)} />
     </CCol>);
+    let empty_col = <CCol style={{ width: "10%", display: "flex", justifyContent: "left" }}></CCol>
+
+    let node_status_table = <SimNodeStatusTable nodes_per_col={this.node_st_n_per_col} node_names={this.state.node_names} node_statuses={this.state.node_statuses} />
+
+    let node_status_col = <CCol style={{ width: "10%", display: "flex", justifyContent: "left" }}>{node_status_table}</CCol>
 
     let battery_status_col = <CCol style={{ width: "10%", display: "flex", justifyContent: "right" }}>Battery Level: {this.state.batteryLevel}%</CCol>;
 
@@ -675,7 +732,7 @@ class SimGamepad extends Component {
       <CCard style={{ width: "100%", borderWidth: "0px"}}>
         <CCardBody>
           <CRow className="align-items-center mb-3 joystick-row" style={{ width: "100%"}}>
-            <CCol style={{ width: "10%", display: "flex", justifyContent: "left" }}></CCol>{stickDisplays}{battery_status_col}
+            {node_status_col}{stickDisplays}{battery_status_col}
           </CRow>
           <CRow className="align-items-center" md={{ cols: "auto", gutter: "auto" }} sm={{ cols: 3, gutter: 2 }} xs={{ cols: 4, gutter: 2 }}>
             {buttons}
