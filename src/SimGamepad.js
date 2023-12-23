@@ -687,8 +687,8 @@ class SimGamepad extends Component {
   joyMove = (x, y, index) =>{
     var axisVals =  this.state.axes;
     // y: forward/back, x: rotation
-    x*=300;
-    y*=30000 * Math.abs(y);
+    x*=100;
+    y*=10000 * Math.abs(y);
     console.log(y);
     axisVals[2*index+1] = y;
     if (y>0){
