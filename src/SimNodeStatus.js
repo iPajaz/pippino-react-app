@@ -22,8 +22,8 @@ class SimNodeStatusTable extends Component {
       // '--cui-list-group-active-bg': "red",
       // '--cui-list-group-active-border-color': "red",
       // '--cui-list-group-variants.primary': 'red'
-      '--cui-list-group-item-padding-y': '3px',
-      '--cui-list-group-item-padding-x': '3px',
+      '--cui-list-group-item-padding-y': '0px',
+      '--cui-list-group-item-padding-x': '2px',
     }
     var n_chunks = Math.ceil(this.props.node_names.length / this.props.nodes_per_col);
     var node_names_chunk;

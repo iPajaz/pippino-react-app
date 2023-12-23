@@ -35,7 +35,7 @@ class SimGamepad extends Component {
   constructor(props) {
     super(props);
     this.controllers = {};
-    this.node_st_n_per_col = 4;
+    this.node_st_n_per_col = 7;
     this.state = {
       node_names: [],
       node_statuses: [],
@@ -688,7 +688,7 @@ class SimGamepad extends Component {
     var axisVals =  this.state.axes;
     // y: forward/back, x: rotation
     x*=300;
-    y*=30000 * y;
+    y*=30000 * Math.abs(y);
     console.log(y);
     axisVals[2*index+1] = y;
     if (y>0){
