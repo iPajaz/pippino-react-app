@@ -12,8 +12,8 @@ function SimGamepadDemo() {
   }
   return (
     <div className="App" style={{ height: "inherit" }}>
-      <ImageStream src="http://192.168.0.25:8080/stream?topic=/strctl/image_raw" type="ros_compressed" id={videoId} />
-      <SimGamepad rosbridgeAddress="ws://192.168.0.25:9090" updateVideoSize={updateVideoSize}/>
+      <ImageStream src="http://192.168.0.26:8080/stream?topic=/strctl/image_raw" type="ros_compressed" id={videoId} />
+      <SimGamepad rosbridgeAddress="ws://192.168.0.26:9090" updateVideoSize={updateVideoSize}/>
     </div>
   );
 }

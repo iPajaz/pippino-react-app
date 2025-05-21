@@ -28,7 +28,8 @@ const node_short_names = {
   'T265': 'T265',
   'global_costmap': 'GCM',
   'bt_navigator': 'BTN',
-  'rplidar_node': 'RPL'
+  'rplidar_node': 'RPL',
+  'planner_server': 'PLA',
 }
 
 class SimGamepad extends Component {
